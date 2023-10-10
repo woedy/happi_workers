@@ -52,8 +52,7 @@ def register_company(request):
         if not is_valid_email(admin_email):
             errors['admin_email'] = ['Valid email required.']
 
-        if check_email_exist(admin_email):
-            errors['admin_email'] = ['Email already exists in our database.']
+
 
         if not admin_name:
             errors['admin_name'] = ['Admin name is required.']
@@ -62,58 +61,71 @@ def register_company(request):
             errors['admin_phone'] = ['Admin phone is required.']
 
 
-
-        # Create New Company Object
-        new_company = Company.objects.create(
-            company_name=company_name,
-            company_phone=admin_phone,
-            company_location=location,
-        )
-#
-        # Add Company Admin
-        new_admin = User.objects.create(
-            email=admin_email,
-            full_name=admin_name,
-            company=new_company,
-            phone=admin_phone,
-            user_type="Admin"
-        )
-#
-#
         try:
-            token = Token.objects.get(user=new_admin)
-        except Token.DoesNotExist:
-            token = Token.objects.create(user=new_admin)
-#
-        # Create Admin privileges
-        new_priv = AdminPrivilege.objects.create(
-            user_id=new_admin,
-        )
-#
-        # Add new ACTIVITY
-        new_activity = AllActivity.objects.create(
-            user=new_admin,
-            subject="Company Added",
-            body=new_admin.email + " Just added a new company."
-        )
-        new_activity.save()
 
-        #SEND EMAIL TO ADMIN/COMPANY for joining the platform.
-        ##
-        ##
-        ##
-        ##
-        ##
-#
-        data['company_name'] = new_company.company_name
-        data['company_id'] = new_company.company_id
-#
-        data['admin_full_name'] = new_admin.full_name
-        data['admin_user_id'] = new_admin.user_id
-        data["admin_token"] = token.key
+            if check_email_exist(admin_email):
+                errors['admin_email'] = ['Admin Email already exists in our database.']
+                payload['message'] = "Errors"
+                payload['errors'] = errors
+                return Response(payload, status=status.HTTP_400_BAD_REQUEST)
 
-        payload['message'] = "Successful"
-        payload['data'] = data
+            # Create New Company Object
+            new_company = Company.objects.create(
+                company_name=company_name,
+                company_phone=admin_phone,
+                company_location=location,
+            )
+
+            # Add Company Admin
+            new_admin = User.objects.create(
+                email=admin_email,
+                full_name=admin_name,
+                company=new_company,
+                phone=admin_phone,
+                user_type="Admin"
+            )
+
+            try:
+                token = Token.objects.get(user=new_admin)
+            except Token.DoesNotExist:
+                token = Token.objects.create(user=new_admin)
+                #
+                # Create Admin privileges
+            new_priv = AdminPrivilege.objects.create(
+                user_id=new_admin,
+            )
+            #
+            # Add new ACTIVITY
+            new_activity = AllActivity.objects.create(
+                user=new_admin,
+                subject="Company Added",
+                body=new_admin.email + " Just added a new company."
+            )
+            new_activity.save()
+
+            # SEND EMAIL TO ADMIN/COMPANY for joining the platform.
+            ##
+            ##
+            ##
+            ##
+            ##
+            #
+            data['company_name'] = new_company.company_name
+            data['company_id'] = new_company.company_id
+            #
+            data['admin_full_name'] = new_admin.full_name
+            data['admin_user_id'] = new_admin.user_id
+            data["admin_token"] = token.key
+
+            payload['message'] = "Successful"
+            payload['data'] = data
+
+
+        except IntegrityError:
+            errors['admin_email'] = ['Admin Email already exists in our database.']
+#
+#
+
 
         if errors:
             payload['message'] = "Errors"

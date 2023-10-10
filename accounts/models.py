@@ -69,8 +69,11 @@ USER_TYPE_CHOICES = (
 
 INTERVAL_CHOICES = (
     ("1 hour", "1 hour"),
-    ("6 hour", "6 hour"),
-    ("24 hour", "24 hour"),
+    ("6 hours", "6 hours"),
+    ("12 hours", "12 hours"),
+    ("8 hours", "8 hours"),
+    ("24 hours", "24 hours"),
+    ("48 hours", "48 hours")
 
 )
 
