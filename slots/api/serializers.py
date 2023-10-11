@@ -13,10 +13,15 @@ class OccupantSerializer(serializers.ModelSerializer):
 
 class AppointmentTimeSerializer(serializers.ModelSerializer):
     occupant = OccupantSerializer(many=False)
+    time = serializers.SerializerMethodField()
 
     class Meta:
         model = TimeSlot
         fields = ['time', 'occupied', 'occupant', ]
+
+    def get_time(self, obj):
+        # Format the time as "HH:MM"
+        return obj.time.strftime("%H:%M")
 
 class AppointmentSlotSerializer(serializers.ModelSerializer):
 

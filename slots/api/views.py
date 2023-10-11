@@ -70,7 +70,7 @@ def set_appointer_slot(request):
                         break
 
                     # Convert the times to datetime objects
-                    time_objects = [datetime.strptime(t, "%H:%M:%S").time() for t in slot['time_slots']]
+                    time_objects = [datetime.strptime(t, "%H:%M").time() for t in slot['time_slots']]
 
                     # Check if the times are at least  hours apart
                     if not are_times_spaced(interval, time_objects):
@@ -206,7 +206,7 @@ def update_appointer_slot(request):
                     time.delete()
 
                 # Convert the times to datetime objects
-                time_objects = [datetime.strptime(t, "%H:%M:%S").time() for t in old_slot['time_slots']]
+                time_objects = [datetime.strptime(t, "%H:%M").time() for t in old_slot['time_slots']]
 
                 # Check if the times are at least  hours apart
                 if not are_times_spaced(interval, time_objects):

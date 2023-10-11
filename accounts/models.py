@@ -87,7 +87,7 @@ class User(AbstractBaseUser):
     phone = models.CharField(max_length=255, blank=True, null=True)
     company = models.ForeignKey("Company", on_delete=models.SET_NULL, null=True, blank=True)
     time_zone = models.CharField(null=True, blank=True, max_length=100)
-    availability_interval = models.CharField(choices=INTERVAL_CHOICES, null=True, blank=True, max_length=100)
+    availability_interval = models.CharField(choices=INTERVAL_CHOICES, default="1 hour", null=True, blank=True, max_length=100)
 
     user_type = models.CharField(choices=USER_TYPE_CHOICES, max_length=255)
 
