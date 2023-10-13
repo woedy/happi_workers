@@ -29,9 +29,8 @@ def set_appointment_view(request):
         pract_id = request.data.get('pract_id', "")
         company_id = request.data.get('company_id', "")
         slot_id = request.data.get('slot_id', "")
-        slot_date = request.data.get('slot_date', "")
         slot_time = request.data.get('slot_time', "")
-        time_zone = request.data.get('time_zone', "")
+
 
         if not client_id:
             errors['client_id'] = ['Client User ID is required.']
@@ -45,14 +44,9 @@ def set_appointment_view(request):
         if not slot_id:
             errors['slot_id'] = ['Slot id is required.']
 
-        if not slot_date:
-            errors['slot_date'] = ['Slot date is required.']
-
         if not slot_time:
             errors['slot_time'] = ['Slot time is required.']
 
-        if not time_zone:
-            errors['time_zone'] = ['User timezone is required.']
 
         try:
             company = Company.objects.get(company_id=company_id)
@@ -76,8 +70,8 @@ def set_appointment_view(request):
 
             # Check if there's already an appointment for the same date and time
             existing_appointment = GenericAppointment.objects.filter(
-                appointment_date=slot_date,
-                appointment_time=slot_time,
+                slot=app_slot,
+                appointment_time=slot_time+":00",
                 appointee=client,
                 appointer=practitioner,
             ).first()
@@ -92,9 +86,9 @@ def set_appointment_view(request):
                 appointer=practitioner,
                 appointee=client,
                 app_admin=admin,
+                slot=app_slot,
                 appointment_date=app_slot.slot_date,
-                appointment_time=slot_time,
-                time_zone=time_zone
+                appointment_time=slot_time+":00",
             )
 
             app_slot.state = "Partial"
@@ -103,17 +97,19 @@ def set_appointment_view(request):
             slot_times = TimeSlot.objects.filter(appointment_slot=app_slot)
 
             for time in slot_times:
-                if str(time.time) == str(slot_time):
+                if str(time.time) == str(slot_time+":00"):
+                    print("################")
+                    print("The time is in database")
                     if time.occupied:
                         errors['slot_time'] = ['Slot time is already occupied.']
                         payload['message'] = "Errors"
                         payload['errors'] = errors
                         return Response(payload, status=status.HTTP_400_BAD_REQUEST)
-
-                    time.occupied = True
-                    time.occupant = client
-                    time.appointment = new_appointment
-                    time.save()
+                    elif not time.occupied:
+                        time.occupied = True
+                        time.occupant = client
+                        time.appointment_id = new_appointment.id
+                        time.save()
 
             occupied_count = TimeSlot.objects.filter(appointment_slot=app_slot, occupied=True)
 
@@ -124,29 +120,23 @@ def set_appointment_view(request):
             # SEND CLIENT EMAIL
             client_subject = f"Yay! Your Appointment with {practitioner.full_name} is Confirmed 🎉"
             client_content = f"Hey {client.full_name},\nGuess what? Your appointment with {practitioner.full_name} on {new_appointment.appointment_date} at {new_appointment.appointment_time} is all set! 🌟\n\nMark your calendar and set your reminders because we can't wait to see you!\n\nCheers,\n\nThe {company.company_name} Team"
-
             client_email = EmailMessage(
                 client_subject,
                 client_content,
                 from_email=settings.DEFAULT_FROM_EMAIL,
                 to=[client.email]
             )
-
             client_email.send()
-
             # SEND PRACTITIONER EMAIL
             pract_subject = f"New Appointment Alert!🚨"
             pract_content = f"Hello {practitioner.full_name},\n\nGreat news! {client.full_name} has booked an appointment with you on {new_appointment.appointment_date} at {new_appointment.appointment_time}. Time to show off your skills!🌟\n\nBest,\n\nThe {company.company_name} Team"
-
             pract_email = EmailMessage(
                 pract_subject,
                 pract_content,
                 from_email=settings.DEFAULT_FROM_EMAIL,
                 to=[practitioner.email]
             )
-
             pract_email.send()
-
             # Add new ACTIVITY
             new_activity = AllActivity.objects.create(
                 user=new_appointment.app_admin,
@@ -226,18 +216,18 @@ def update_appointment_view(request):
 
             slot_times = TimeSlot.objects.all().filter(appointment_slot=app_slot)
 
-            appointment.appointment_time = new_slot_time
+            appointment.appointment_time = new_slot_time+":00"
             appointment.save()
 
             for time in slot_times:
 
-                if str(time.time) == str(old_slot_time):
+                if str(time.time) == str(old_slot_time+":00"):
                     time.appointment = None
                     time.occupied = False
                     time.occupant = None
                     time.save()
 
-                if str(time.time) == str(new_slot_time):
+                if str(time.time) == str(new_slot_time+":00"):
                     time.appointment = appointment
                     time.occupied = True
                     time.occupant = client

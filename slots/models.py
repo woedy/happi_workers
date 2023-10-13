@@ -1,7 +1,6 @@
 from django.conf import settings
 from django.db import models
 
-from appointments.models import GenericAppointment
 
 # Create your models here.
 
@@ -28,7 +27,8 @@ class AppointmentSlot(models.Model):
 
 class TimeSlot(models.Model):
     appointment_slot = models.ForeignKey(AppointmentSlot, on_delete=models.CASCADE, related_name="slot_times")
-    appointment = models.ForeignKey(GenericAppointment, null=True, blank=True, on_delete=models.SET_NULL, related_name="slot_appointment")
+    #appointment = models.ForeignKey(GenericAppointment, null=True, blank=True, on_delete=models.SET_NULL, related_name="slot_appointment")
+    appointment_id = models.IntegerField(null=True, blank=True)
 
     time = models.TimeField(null=True, blank=True)
 
@@ -40,4 +40,13 @@ class TimeSlot(models.Model):
     active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+
+
+class RecurringAvailability(models.Model):
+    user_id = models.ForeignKey(User, on_delete=models.CASCADE, related_name="recurring_slot")
+    start_date = models.DateField()
+    end_date = models.DateField()
+    recurrence_rule = models.CharField(max_length=255)
+
 

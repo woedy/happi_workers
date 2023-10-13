@@ -4,6 +4,7 @@ from django.db.models import Q
 from django.db.models.signals import pre_save
 
 from mysite.utils import unique_appointment_id_generator
+from slots.models import AppointmentSlot
 
 User = settings.AUTH_USER_MODEL
 
@@ -80,6 +81,9 @@ class GenericAppointment(models.Model):
     app_admin = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="appointment_admin")
 
     appointment_type = models.CharField(max_length=255, default="Therapy", null=True, blank=True, choices=APPOINTMENT_TYPE_CHOICES)
+
+    slot = models.ForeignKey(AppointmentSlot, on_delete=models.SET_NULL, null=True, blank=True, related_name="app_slot")
+
     appointment_date = models.DateField(auto_now=False, auto_now_add=False, null=True, blank=True)
     appointment_time = models.TimeField(auto_now=False, auto_now_add=False, null=True, blank=True)
     time_zone = models.CharField(null=True, blank=True, max_length=100)
