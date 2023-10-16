@@ -297,13 +297,11 @@ def approve_appointment_view(request):
 
     if request.method == 'POST':
 
-        client_id = request.data.get('client_id', "")
 
         company_id = request.data.get('company_id', "")
         appointment_id = request.data.get('appointment_id', "")
 
-        if not client_id:
-            errors['client_id'] = ['Client User ID is required.']
+
 
         if not company_id:
             errors['company_id'] = ['Company ID is required.']
@@ -357,13 +355,11 @@ def decline_appointment_view(request):
 
     if request.method == 'POST':
 
-        client_id = request.data.get('client_id', "")
 
         company_id = request.data.get('company_id', "")
         appointment_id = request.data.get('appointment_id', "")
 
-        if not client_id:
-            errors['client_id'] = ['Client User ID is required.']
+
 
         if not company_id:
             errors['company_id'] = ['Company ID is required.']
@@ -422,13 +418,11 @@ def start_appointment_view(request):
 
     if request.method == 'POST':
 
-        client_id = request.data.get('client_id', "")
 
         company_id = request.data.get('company_id', "")
         appointment_id = request.data.get('appointment_id', "")
 
-        if not client_id:
-            errors['client_id'] = ['Client User ID is required.']
+
 
         if not company_id:
             errors['company_id'] = ['Company ID is required.']
@@ -483,13 +477,10 @@ def set_appointment_ongoing_view(request):
 
     if request.method == 'POST':
 
-        client_id = request.data.get('client_id', "")
 
         company_id = request.data.get('company_id', "")
         appointment_id = request.data.get('appointment_id', "")
 
-        if not client_id:
-            errors['client_id'] = ['Client User ID is required.']
 
         if not company_id:
             errors['company_id'] = ['Company ID is required.']
@@ -541,13 +532,10 @@ def complete_appointment_view(request):
 
     if request.method == 'POST':
 
-        client_id = request.data.get('client_id', "")
 
         company_id = request.data.get('company_id', "")
         appointment_id = request.data.get('appointment_id', "")
 
-        if not client_id:
-            errors['client_id'] = ['Client User ID is required.']
 
         if not company_id:
             errors['company_id'] = ['Company ID is required.']
@@ -600,12 +588,9 @@ def cancel_appointment_view(request):
     errors = {}
 
     if request.method == 'POST':
-        client_id = request.data.get('client_id', "")
         company_id = request.data.get('company_id', "")
         appointment_id = request.data.get('appointment_id', "")
 
-        if not client_id:
-            errors['client_id'] = ['Client User ID is required.']
 
         if not company_id:
             errors['company_id'] = ['Company ID is required.']
@@ -701,7 +686,6 @@ def list_practitioner_appointment_view(request):
     if request.method == 'POST':
 
         pract_id = request.data.get('pract_id', "")
-
         company_id = request.data.get('company_id', "")
 
         if not pract_id:
