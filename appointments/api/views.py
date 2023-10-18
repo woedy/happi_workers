@@ -71,7 +71,7 @@ def set_appointment_view(request):
             # Check if there's already an appointment for the same date and time
             existing_appointment = GenericAppointment.objects.filter(
                 slot=app_slot,
-                appointment_time=slot_time+":00",
+                appointment_time=slot_time,
                 appointee=client,
                 appointer=practitioner,
             ).first()
@@ -88,7 +88,7 @@ def set_appointment_view(request):
                 app_admin=admin,
                 slot=app_slot,
                 appointment_date=app_slot.slot_date,
-                appointment_time=slot_time+":00",
+                appointment_time=slot_time,
             )
 
             app_slot.state = "Partial"
@@ -97,7 +97,7 @@ def set_appointment_view(request):
             slot_times = TimeSlot.objects.filter(appointment_slot=app_slot)
 
             for time in slot_times:
-                if str(time.time) == str(slot_time+":00"):
+                if str(time.time) == str(slot_time):
                     print("################")
                     print("The time is in database")
                     if time.occupied:
@@ -216,18 +216,18 @@ def update_appointment_view(request):
 
             slot_times = TimeSlot.objects.all().filter(appointment_slot=app_slot)
 
-            appointment.appointment_time = new_slot_time+":00"
+            appointment.appointment_time = new_slot_time
             appointment.save()
 
             for time in slot_times:
 
-                if str(time.time) == str(old_slot_time+":00"):
+                if str(time.time) == str(old_slot_time):
                     time.appointment = None
                     time.occupied = False
                     time.occupant = None
                     time.save()
 
-                if str(time.time) == str(new_slot_time+":00"):
+                if str(time.time) == str(new_slot_time):
                     time.appointment = appointment
                     time.occupied = True
                     time.occupant = client
@@ -375,16 +375,18 @@ def decline_appointment_view(request):
         try:
             appointment = GenericAppointment.objects.get(appointment_id=appointment_id)
 
-            time_slots_data = TimeSlot.objects.all().filter(appointment=appointment).first()
+            print(appointment)
+            time_slots_data = TimeSlot.objects.all().filter(appointment_id=appointment.id).first()
+            print(time_slots_data)
             time_slots_data.appointment = None
             time_slots_data.occupied = False
             time_slots_data.occupant = None
             time_slots_data.save()
-
+#
             appointment.status = "Declined"
             appointment.appointment_declined_at = timezone.now()
             appointment.save()
-
+#
             # Add new ACTIVITY
             new_activity = AllActivity.objects.create(
                 user=appointment.app_admin,
@@ -393,16 +395,18 @@ def decline_appointment_view(request):
             )
             new_activity.save()
 
+            payload['message'] = "Appointment declined successfully"
+            payload['data'] = data
+
         except:
             errors['appointment_id'] = ['Appointment does not exist.']
+
 
         if errors:
             payload['message'] = "Errors"
             payload['errors'] = errors
             return Response(payload, status=status.HTTP_400_BAD_REQUEST)
 
-        payload['message'] = "Appointment declined successfully"
-        payload['data'] = data
 
         return Response(payload)
 
@@ -618,8 +622,7 @@ def cancel_appointment_view(request):
                 payload['message'] = "Appointment is already canceled."
                 return Response(payload, status=status.HTTP_400_BAD_REQUEST)
 
-
-            time_slot = TimeSlot.objects.filter(appointment=appointment).first()
+            time_slot = TimeSlot.objects.all().filter(appointment_id=appointment.id).first()
             if time_slot:
                 time_slot.appointment = None
                 time_slot.occupied = False
