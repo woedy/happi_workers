@@ -338,9 +338,17 @@ def update_appointment_view(request):
 
         if not old_slot_time:
             errors['old_slot_time'] = ['Old slot time is required.']
+        else:
+            # Ensure the time is in the format "HH:MM:SS"
+            if len(old_slot_time) < 8:
+                old_slot_time += ':00'
 
         if not new_slot_time:
             errors['new_slot_time'] = ['New slot time is required.']
+        else:
+            # Ensure the time is in the format "HH:MM:SS"
+            if len(new_slot_time) < 8:
+                new_slot_time += ':00'
 
         if not appointment_id:
             errors['appointment_id'] = ['Appointment Id is required.']
