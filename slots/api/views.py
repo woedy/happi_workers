@@ -2,6 +2,7 @@ from datetime import datetime, date, timedelta
 
 from dateutil.relativedelta import relativedelta
 from django.contrib.auth import get_user_model
+from django.db.models import Q
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.response import Response
@@ -13,20 +14,227 @@ from slots.models import AppointmentSlot, TimeSlot
 
 User = get_user_model()
 
+
+
 @api_view(['POST', ])
 @permission_classes([])
 @authentication_classes([])
 def set_appointer_slot(request):
     payload = {}
     data = {}
-
     errors = {}
 
     if request.method == 'POST':
         pract_id = request.data.get('pract_id', "")
         company_id = request.data.get('company_id', "")
         timezone = request.data.get('timezone', "")
-        availability = request.data.get('availability', "")
+        availability = request.data.get('availability', [])
+
+        if not pract_id:
+            errors['pract_id'] = ['Practitioner User ID is required.']
+
+        if not company_id:
+            errors['company_id'] = ['Company ID is required.']
+
+        if not timezone:
+            errors['timezone'] = ['Timezone is required.']
+
+        if not availability:
+            errors['availability'] = ['Availability is required.']
+
+        try:
+            company = Company.objects.get(company_id=company_id)
+        except Company.DoesNotExist:
+            errors['company_id'] = ['Company does not exist.']
+
+        try:
+            appointer = User.objects.get(user_id=pract_id)
+            interval = appointer.availability_interval
+
+            if interval is None:
+                errors['availability'] = [f'Please set your availability interval first.']
+                payload['message'] = "Errors"
+                payload['errors'] = errors
+                return Response(payload, status=status.HTTP_400_BAD_REQUEST)
+
+            # Fetch the existing slots for the practitioner
+            existing_slots = AppointmentSlot.objects.filter(user_id=appointer)
+            existing_slot_dates = existing_slots.values_list('slot_date', flat=True)
+
+            appointer_list = ['Practitioner', 'Doctor', 'Teacher', 'Interviewer']
+            if appointer.user_type in appointer_list:
+                for slot_data in availability:
+                    slot_date = slot_data.get('date')
+                    new_time_slots = slot_data.get('time_slots')
+
+                    # Check if a slot with the same date already exists
+                    existing_slot = existing_slots.filter(slot_date=slot_date).first()
+
+                    if existing_slot:
+                        # Slot already exists, update it
+                        existing_time_slots = TimeSlot.objects.filter(appointment_slot=existing_slot)
+
+                        # Iterate through the new time slots
+                        for time in new_time_slots:
+                            existing_time_slot = existing_time_slots.filter(time=time).first()
+                            if existing_time_slot:
+                                if existing_time_slot.occupied:
+                                    # Time slot is occupied, continue to the next slot
+                                    continue
+                            else:
+                                # Create a new time slot if it doesn't exist
+                                TimeSlot.objects.create(
+                                    appointment_slot=existing_slot,
+                                    time=time,
+                                    occupied=False
+                                )
+                        # Delete time slots that are not in the new list
+                        existing_time_slots.filter(~Q(time__in=new_time_slots)).delete()
+                    else:
+                        # Slot doesn't exist, create a new slot
+                        new_slot = AppointmentSlot.objects.create(user_id=appointer, slot_date=slot_date)
+                        for time in new_time_slots:
+                            TimeSlot.objects.create(
+                                appointment_slot=new_slot,
+                                time=time,
+                                occupied=False
+                            )
+
+                # Delete slots that are not in the new list
+                existing_slots.filter(~Q(slot_date__in=[s['date'] for s in availability])).delete()
+
+        except User.DoesNotExist:
+            errors['pract_id'] = ['Practitioner does not exist.']
+
+        if errors:
+            payload['message'] = "Errors"
+            payload['errors'] = errors
+            return Response(payload, status=status.HTTP_400_BAD_REQUEST)
+
+        payload['message'] = "Slot added or updated successfully"
+        payload['data'] = data
+
+        return Response(payload)
+
+
+@api_view(['POST', ])
+@permission_classes([])
+@authentication_classes([])
+def set_appointer_slot4444(request):
+    payload = {}
+    data = {}
+    errors = {}
+
+    if request.method == 'POST':
+        pract_id = request.data.get('pract_id', "")
+        company_id = request.data.get('company_id', "")
+        timezone = request.data.get('timezone', "")
+        availability = request.data.get('availability', [])
+
+        if not pract_id:
+            errors['pract_id'] = ['Practitioner User ID is required.']
+
+        if not company_id:
+            errors['company_id'] = ['Company ID is required.']
+
+        if not timezone:
+            errors['timezone'] = ['Timezone is required.']
+
+        if not availability:
+            errors['availability'] = ['Availability is required.']
+
+        try:
+            company = Company.objects.get(company_id=company_id)
+        except Company.DoesNotExist:
+            errors['company_id'] = ['Company does not exist.']
+
+        try:
+            appointer = User.objects.get(user_id=pract_id)
+            interval = appointer.availability_interval
+
+            if interval is None:
+                errors['availability'] = [f'Please set your availability interval first.']
+                payload['message'] = "Errors"
+                payload['errors'] = errors
+                return Response(payload, status=status.HTTP_400_BAD_REQUEST)
+
+            # Fetch the existing slots for the practitioner
+            existing_slots = AppointmentSlot.objects.filter(user_id=appointer)
+            existing_slot_dates = existing_slots.values_list('slot_date', flat=True)
+
+            appointer_list = ['Practitioner', 'Doctor', 'Teacher', 'Interviewer']
+            if appointer.user_type in appointer_list:
+                for slot_data in availability:
+                    slot_date = slot_data.get('date')
+                    new_time_slots = slot_data.get('time_slots')
+
+                    # Check if a slot with the same date already exists
+                    existing_slot = existing_slots.filter(slot_date=slot_date).first()
+
+                    if existing_slot:
+                        # Slot already exists, update it
+                        existing_time_slots = TimeSlot.objects.filter(appointment_slot=existing_slot)
+
+                        # Iterate through the new time slots
+                        for time in new_time_slots:
+                            existing_time_slot = existing_time_slots.filter(time=time).first()
+                            if existing_time_slot:
+                                if existing_time_slot.occupied:
+                                    # Time slot is occupied, continue to the next slot
+                                    continue
+                            else:
+                                # Create a new time slot if it doesn't exist
+                                TimeSlot.objects.create(
+                                    appointment_slot=existing_slot,
+                                    time=time,
+                                    occupied=False
+                                )
+                        # Delete time slots that are not in the new list
+                        existing_time_slots.filter(~Q(time__in=new_time_slots)).delete()
+                    else:
+                        # Slot doesn't exist, create a new slot
+                        new_slot = AppointmentSlot.objects.create(user_id=appointer, slot_date=slot_date)
+                        for time in new_time_slots:
+                            TimeSlot.objects.create(
+                                appointment_slot=new_slot,
+                                time=time,
+                                occupied=False
+                            )
+
+                # Delete slots that are not in the new list
+                existing_slots.filter(~Q(slot_date__in=[s['date'] for s in availability])).delete()
+
+        except User.DoesNotExist:
+            errors['pract_id'] = ['Practitioner does not exist.']
+
+        if errors:
+            payload['message'] = "Errors"
+            payload['errors'] = errors
+            return Response(payload, status=status.HTTP_400_BAD_REQUEST)
+
+        payload['message'] = "Slot added or updated successfully"
+        payload['data'] = data
+
+        return Response(payload)
+
+
+
+
+
+
+@api_view(['POST', ])
+@permission_classes([])
+@authentication_classes([])
+def set_appointer_slot333333(request):
+    payload = {}
+    data = {}
+    errors = {}
+
+    if request.method == 'POST':
+        pract_id = request.data.get('pract_id', "")
+        company_id = request.data.get('company_id', "")
+        timezone = request.data.get('timezone', "")
+        availability = request.data.get('availability', [])
 
         if not pract_id:
             errors['pract_id'] = ['Practitioner User ID is required.']
@@ -56,65 +264,67 @@ def set_appointer_slot(request):
                 payload['errors'] = errors
                 return Response(payload, status=status.HTTP_400_BAD_REQUEST)
 
+            # Fetch the existing slots for the practitioner
+            existing_slots = AppointmentSlot.objects.filter(user_id=appointer)
 
             appointer_list = ['Practitioner', 'Doctor', 'Teacher', 'Interviewer']
             if appointer.user_type in appointer_list:
-                for slot in availability:
-                    slot_date = slot.get('date')
+                for slot_data in availability:
+                    slot_date = slot_data.get('date')
 
                     # Check if a slot with the same date already exists
-                    existing_slot = AppointmentSlot.objects.filter(user_id=appointer, slot_date=slot_date).first()
+                    existing_slot = existing_slots.filter(slot_date=slot_date).first()
+
                     if existing_slot:
-                        errors['availability'] = ['Slot with the same date already exists.']
-                        break
+                        # If the slot exists, check for occupied time slots
+                        occupied_time_slots = existing_slot.slot_times.filter(occupied=True)
+                        new_time_slots = slot_data.get('time_slots')
 
-                    # Convert the times to datetime objects
-                    time_objects = [datetime.strptime(t, "%H:%M:%S" if len(t) > 5 else "%H:%M").time() for t in slot['time_slots']]
+                        # Remove unoccupied time slots
+                        unoccupied_time_slots = [time for time in new_time_slots if time not in occupied_time_slots]
 
-                    # Check if the times are at least  hours apart
-                    if not are_times_spaced(interval, time_objects):
-                        errors['availability'] = [f'Times provided should be at least {interval} apart.']
-                        payload['message'] = "Errors"
-                        payload['errors'] = errors
-                        return Response(payload, status=status.HTTP_400_BAD_REQUEST)
+                        if unoccupied_time_slots:
+                            # Update the slot with unoccupied time slots
+                            existing_slot.slot_times.filter(time__in=unoccupied_time_slots).delete()
+                        else:
+                            # All time slots are occupied, continue to the next slot
+                            continue
+                    else:
+                        unoccupied_time_slots = slot_data.get('time_slots')
 
-
-
-                    new_slot = AppointmentSlot.objects.create(
+                    # Create or update the slot with the new time slots
+                    new_slot, created = AppointmentSlot.objects.get_or_create(
                         user_id=appointer,
                         slot_date=slot_date
                     )
 
-
-
-
-
-                    for time in slot['time_slots']:
-                        new_time_slot = TimeSlot.objects.create(
+                    for time in unoccupied_time_slots:
+                        TimeSlot.objects.create(
                             appointment_slot=new_slot,
-                            time=time
+                            time=time,
+                            occupied=False  # Ensure that new slots are marked as unoccupied
                         )
-                        new_slot.time_slot_count = len(slot['time_slots'])
-                        new_slot.save()
 
-                        # Add new ACTIVITY
-                        new_activity = AllActivity.objects.create(
-                            user=User.objects.get(id=1),
-                            subject="Availability set",
-                            body=f"{appointer.full_name} just added their availability."
-                        )
-                        new_activity.save()
+                    # Update the time slot count for the slot
+                    new_slot.time_slot_count = len(unoccupied_time_slots)
+                    new_slot.save()
+
+                    # Add new ACTIVITY
+                    new_activity = AllActivity.objects.create(
+                        user=User.objects.get(id=1),
+                        subject="Availability set",
+                        body=f"{appointer.full_name} just added their availability."
+                    )
+                    new_activity.save()
         except User.DoesNotExist:
             errors['pract_id'] = ['Practitioner does not exist.']
-
-
 
         if errors:
             payload['message'] = "Errors"
             payload['errors'] = errors
             return Response(payload, status=status.HTTP_400_BAD_REQUEST)
 
-        payload['message'] = "Slot added successfully"
+        payload['message'] = "Slot added or updated successfully"
         payload['data'] = data
 
         return Response(payload)
@@ -687,6 +897,7 @@ def set_recurring_slot(request):
 
                 if frequency == "Daily":
                     current_date += timedelta(days=repeat)
+
                 elif frequency == "Monthly":
                     next_month = current_date + relativedelta(months=repeat)
                     current_date = next_month.replace(day=1)
@@ -725,9 +936,52 @@ def set_recurring_slot(request):
 
                     repeat_count = repeat  # Reset the repeat_count to the original value when adding a slot
 
-        print(adjusted_slots)
+            print("#############")
+            print(adjusted_slots)
+            for slot in adjusted_slots:
+                print(slot)
+                new_slot = AppointmentSlot.objects.create(
+                    user_id=appointer,
+                    slot_date=slot,
+                    is_recurring=True
+                )
+                new_time_slot = TimeSlot.objects.create(
+                    appointment_slot=new_slot,
+                    time=time
+                )
+                new_slot.time_slot_count = 1
+                new_slot.save()
 
-        print(len(adjusted_slots))
+        if frequency != "Weekly":
+            for slot in slots:
+                print(slot)
+                new_slot = AppointmentSlot.objects.create(
+                    user_id=appointer,
+                    slot_date=str(slot).split(" ")[0],
+                    is_recurring=True
+                )
+                new_time_slot = TimeSlot.objects.create(
+                    appointment_slot=new_slot,
+                    time=str(slot).split(" ")[1]
+                )
+                new_slot.time_slot_count = 1
+                new_slot.save()
+
+
+
+
+        # Add new ACTIVITY
+        new_activity = AllActivity.objects.create(
+            user=User.objects.get(id=1),
+            subject="Availability set - recurring",
+            body=f"{appointer.full_name} just added a recurring availability."
+        )
+        new_activity.save()
+
+
+        #print(adjusted_slots)
+
+#        print(len(adjusted_slots))
 
         # Store the slots in the AppointmentSlot
 

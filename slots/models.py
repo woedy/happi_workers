@@ -18,6 +18,7 @@ class AppointmentSlot(models.Model):
     time_slot_count = models.IntegerField(default=0)
     state = models.CharField(default="Vacant", choices=SLOT_STATE_CHOICES, max_length=255)
 
+    is_recurring = models.BooleanField(default=False)
 
     active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
