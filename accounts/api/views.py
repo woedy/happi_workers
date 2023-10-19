@@ -333,3 +333,48 @@ def list_user_privileges(request):
         return Response(payload)
 
 
+
+
+
+@api_view(['POST', ])
+@permission_classes([])
+@authentication_classes([])
+def get_user_data(request):
+    payload = {}
+    data = {}
+    errors = {}
+
+    if request.method == 'POST':
+        user_id = request.data.get('user_id', "").lower()
+
+
+        if not user_id:
+            errors['user_id'] = ['User ID is required.']
+
+        try:
+            user = User.objects.get(user_id=user_id)
+
+            data['user_id'] = user.user_id
+            data['email'] = user.email
+            data['full_name'] = user.full_name
+            data['phone'] = user.phone
+            data['company'] = user.company.company_name
+            data['company_id'] = user.company.company_id
+            data['time_zone'] = user.time_zone
+            data['availability_interval'] = user.availability_interval
+            data['user_type'] = user.user_type
+
+
+        except User.DoesNotExist:
+            errors['user_id'] = ['User does not exist.']
+
+        if errors:
+            payload['message'] = "Errors"
+            payload['errors'] = errors
+            return Response(payload, status=status.HTTP_400_BAD_REQUEST)
+
+        payload['message'] = "Successful"
+        payload['data'] = data
+
+        return Response(payload)
+
