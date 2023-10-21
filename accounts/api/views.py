@@ -345,14 +345,14 @@ def get_user_data(request):
     errors = {}
 
     if request.method == 'POST':
-        user_id = request.data.get('user_id', "").lower()
+        email = request.data.get('email', "").lower()
 
 
-        if not user_id:
-            errors['user_id'] = ['User ID is required.']
+        if not email:
+            errors['email'] = ['User email is required.']
 
         try:
-            user = User.objects.get(user_id=user_id)
+            user = User.objects.get(email=email)
 
             data['user_id'] = user.user_id
             data['email'] = user.email
