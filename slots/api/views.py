@@ -1000,51 +1000,228 @@ def set_recurring_slot(request):
 
         return Response(payload)
 
+
 @api_view(['POST', ])
 @permission_classes([])
 @authentication_classes([])
-def set_recurring_slot2222222(request):
+def set_recurring_list_slot(request):
     payload = {}
     data = {}
-
     errors = {}
+    repeat = 1
+
+    if request.method == 'POST':
+        pract_id = request.data.get('pract_id', "")
+        company_id = request.data.get('company_id', "")
+        timezone = request.data.get('timezone', "")
+        frequency = request.data.get('frequency', "")
+
+        availabilities = request.data.get('availabilities', [])
+
+
+        if not pract_id:
+            errors['pract_id'] = ['Practitioner User ID is required.']
+        if not company_id:
+            errors['company_id'] = ['Company ID is required.']
+        if not timezone:
+            errors['timezone'] = ['Timezone is required.']
+        if not frequency:
+            errors['frequency'] = ['Frequency is required.']
+
+
+        if not availabilities:
+            errors['availabilities'] = ['Availability list is required.']
+
+
+        for availability_data in availabilities:
+
+            start_date = availability_data.get('start_date', "")
+            end_date = availability_data.get('end_date', "")
+            time = availability_data.get('time', "")
+
+            week_days = availability_data.get('week_days', "")
+
+            # Validate the parameters
+
+            if not start_date:
+                errors['start_date'] = ['Start date is required.']
+            if not end_date:
+                errors['end_date'] = ['End date is required.']
+            if not time:
+                errors['time'] = ['Time is required.']
+
+            if not repeat or repeat <= 0:
+                errors['repeat'] = ['Repeat must be a positive integer.']
+
+            if errors:
+                payload['message'] = "Errors"
+                payload['errors'] = errors
+                return Response(payload, status=status.HTTP_400_BAD_REQUEST)
+
+            try:
+                company = Company.objects.get(company_id=company_id)
+            except Company.DoesNotExist:
+                errors['company_id'] = ['Company does not exist.']
+
+            try:
+                appointer = User.objects.get(user_id=pract_id)
+            except User.DoesNotExist:
+                errors['pract_id'] = ['Practitioner does not exist.']
+
+            if errors:
+                payload['message'] = "Errors"
+                payload['errors'] = errors
+                return Response(payload, status=status.HTTP_400_BAD_REQUEST)
+
+            # Parse the date and time strings into datetime objects
+            start_datetime = datetime.strptime(start_date + " " + time, "%Y-%m-%d %H:%M")
+            end_datetime = datetime.strptime(end_date + " " + time, "%Y-%m-%d %H:%M")
+
+            slots = []
+
+            if frequency != "Weekly":
+                # Calculate recurring slots based on the provided parameters for other frequencies
+                current_date = start_datetime
+                while current_date <= end_datetime:
+                    slots.append(current_date)
+
+                    if frequency == "Daily":
+                        current_date += timedelta(days=repeat)
+
+                    elif frequency == "Monthly":
+                        next_month = current_date + relativedelta(months=repeat)
+                        current_date = next_month.replace(day=1)
+                    elif frequency == "Yearly":
+                        current_date += relativedelta(years=repeat)
+
+            elif frequency == "Weekly":
+
+                # Parse the week_days string to get a list of selected weekdays (0=Monday, 6=Sunday)
+
+                selected_weekdays = week_days
+
+                # Calculate recurring slots based on the provided parameters for weekly frequency
+
+                slots = []
+
+                current_date = start_datetime
+
+                while current_date <= end_datetime:
+
+                    if current_date.weekday() in selected_weekdays:
+                        slots.append(current_date.date())
+
+                    current_date += timedelta(days=1)
+
+                # Adjust the slots for the repeat value
+
+                adjusted_slots = []
+
+                repeat_count = repeat  # Initialize the repeat_count
+
+                for i, slot in enumerate(slots):
+
+                    if i % repeat_count == 0:
+                        adjusted_slots.append(slot)
+
+                        repeat_count = repeat  # Reset the repeat_count to the original value when adding a slot
+
+                print("#############")
+                print(adjusted_slots)
+                for slot in adjusted_slots:
+                    print(slot)
+                    new_slot = AppointmentSlot.objects.create(
+                        user_id=appointer,
+                        slot_date=slot,
+                        is_recurring=True
+                    )
+                    new_time_slot = TimeSlot.objects.create(
+                        appointment_slot=new_slot,
+                        time=time
+                    )
+                    new_slot.time_slot_count = 1
+                    new_slot.save()
+
+            if frequency != "Weekly":
+                for slot in slots:
+                    print(slot)
+                    new_slot = AppointmentSlot.objects.create(
+                        user_id=appointer,
+                        slot_date=str(slot).split(" ")[0],
+                        is_recurring=True
+                    )
+                    new_time_slot = TimeSlot.objects.create(
+                        appointment_slot=new_slot,
+                        time=str(slot).split(" ")[1]
+                    )
+                    new_slot.time_slot_count = 1
+                    new_slot.save()
+
+        # Add new ACTIVITY
+        new_activity = AllActivity.objects.create(
+            user=User.objects.get(id=1),
+            subject="Availability set - recurring",
+            body=f"{appointer.full_name} just added a recurring availability."
+        )
+        new_activity.save()
+
+
+        #print(adjusted_slots)
+
+#        print(len(adjusted_slots))
+
+        # Store the slots in the AppointmentSlot
+
+        payload['message'] = "Recurring slots added successfully"
+        payload['data'] = data
+
+        return Response(payload)
+
+
+
+@api_view(['POST', ])
+@permission_classes([])
+@authentication_classes([])
+def set_recurring_list_slot2222(request):
+    payload = {}
+    data = {}
+    errors = {}
+    frequency = "Weekly"
+    repeat = 1
 
     if request.method == 'POST':
         pract_id = request.data.get('pract_id', "")
         company_id = request.data.get('company_id', "")
         timezone = request.data.get('timezone', "")
 
-        start_date = request.data.get('start_date', "")
-        end_date = request.data.get('end_date', "")
-        time = request.data.get('time', "")
-        frequency = request.data.get('frequency', "")
+        startRecur = request.data.get('startRecur', "")
+        endRecur = request.data.get('endRecur', "")
+        startTime = request.data.get('startTime', "")
 
-        repeat = request.data.get('repeat', "")
+        daysOfWeek = request.data.get('daysOfWeek', "")
 
+        # Validate the parameters
         if not pract_id:
             errors['pract_id'] = ['Practitioner User ID is required.']
-
         if not company_id:
             errors['company_id'] = ['Company ID is required.']
-
         if not timezone:
             errors['timezone'] = ['Timezone is required.']
-
-        if not start_date:
-            errors['start_date'] = ['Start date is required.']
-
-        if not end_date:
-            errors['end_date'] = ['End date is required.']
-
-        if not time:
-            errors['time'] = ['Time is required.']
-
+        if not startRecur:
+            errors['startRecur'] = ['Start date is required.']
+        if not endRecur:
+            errors['endRecur'] = ['End date is required.']
+        if not startTime:
+            errors['startTime'] = ['Time is required.']
         if not frequency:
             errors['frequency'] = ['Frequency is required.']
+        if not repeat or repeat <= 0:
+            errors['repeat'] = ['Repeat must be a positive integer.']
 
-        if not repeat:
-            errors['repeat'] = ['Repeat is required.']
-
+        if errors:
+            payload['message'] = "Errors"
+            payload['errors'] = errors
+            return Response(payload, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             company = Company.objects.get(company_id=company_id)
@@ -1053,48 +1230,118 @@ def set_recurring_slot2222222(request):
 
         try:
             appointer = User.objects.get(user_id=pract_id)
-
-            #### Daily Logic
-            if frequency == "Daily":
-                print("#############")
-                print("Daily")
-                slots = []
-
-            #### Weekly Logic
-
-            if frequency == "Weekly":
-                print("#############")
-                print("Weekly")
-
-
-
-            #### Monthly Logic
-
-            if frequency == "Monthly":
-                print("#############")
-                print("Monthly")
-
-
-            #### Yearly Logic
-
-            if frequency == "Yearly":
-                print("#############")
-                print("Yearly")
-
-
         except User.DoesNotExist:
             errors['pract_id'] = ['Practitioner does not exist.']
-
-
 
         if errors:
             payload['message'] = "Errors"
             payload['errors'] = errors
             return Response(payload, status=status.HTTP_400_BAD_REQUEST)
 
+        # Parse the date and time strings into datetime objects
+        start_datetime = datetime.strptime(startRecur + " " + startTime, "%Y-%m-%d %H:%M")
+        end_datetime = datetime.strptime(endRecur + " " + startTime, "%Y-%m-%d %H:%M")
+
+        slots = []
+
+        if frequency != "Weekly":
+            # Calculate recurring slots based on the provided parameters for other frequencies
+            current_date = start_datetime
+            while current_date <= end_datetime:
+                slots.append(current_date)
+
+                if frequency == "Daily":
+                    current_date += timedelta(days=repeat)
+
+                elif frequency == "Monthly":
+                    next_month = current_date + relativedelta(months=repeat)
+                    current_date = next_month.replace(day=1)
+                elif frequency == "Yearly":
+                    current_date += relativedelta(years=repeat)
+
+        elif frequency == "Weekly":
+
+            # Parse the week_days string to get a list of selected weekdays (0=Monday, 6=Sunday)
+
+            selected_weekdays = daysOfWeek
+
+            # Calculate recurring slots based on the provided parameters for weekly frequency
+
+            slots = []
+
+            current_date = start_datetime
+
+            while current_date <= end_datetime:
+
+                if current_date.weekday() in selected_weekdays:
+                    slots.append(current_date.date())
+
+                current_date += timedelta(days=1)
+
+            # Adjust the slots for the repeat value
+
+            adjusted_slots = []
+
+            repeat_count = repeat  # Initialize the repeat_count
+
+            for i, slot in enumerate(slots):
+
+                if i % repeat_count == 0:
+                    adjusted_slots.append(slot)
+
+                    repeat_count = repeat  # Reset the repeat_count to the original value when adding a slot
+
+            print("#############")
+            print(adjusted_slots)
+            for slot in adjusted_slots:
+                print(slot)
+                new_slot = AppointmentSlot.objects.create(
+                    user_id=appointer,
+                    slot_date=slot,
+                    is_recurring=True
+                )
+                new_time_slot = TimeSlot.objects.create(
+                    appointment_slot=new_slot,
+                    time=startTime
+                )
+                new_slot.time_slot_count = 1
+                new_slot.save()
+
+        if frequency != "Weekly":
+            for slot in slots:
+                print(slot)
+                new_slot = AppointmentSlot.objects.create(
+                    user_id=appointer,
+                    slot_date=str(slot).split(" ")[0],
+                    is_recurring=True
+                )
+                new_time_slot = TimeSlot.objects.create(
+                    appointment_slot=new_slot,
+                    time=str(slot).split(" ")[1]
+                )
+                new_slot.time_slot_count = 1
+                new_slot.save()
+
+
+
+
+        # Add new ACTIVITY
+        new_activity = AllActivity.objects.create(
+            user=User.objects.get(id=1),
+            subject="Availability set - recurring",
+            body=f"{appointer.full_name} just added a recurring availability."
+        )
+        new_activity.save()
+
+
+        #print(adjusted_slots)
+
+#        print(len(adjusted_slots))
+
+        # Store the slots in the AppointmentSlot
+
         payload['message'] = "Recurring slots added successfully"
         payload['data'] = data
 
         return Response(payload)
-
 
