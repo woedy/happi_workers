@@ -87,6 +87,13 @@ def set_appointment_view(request):
                 payload['errors'] = errors
                 return Response(payload, status=status.HTTP_400_BAD_REQUEST)
 
+
+
+            # Check for appointment interval
+            _slot_date = app_slot.slot_date
+            pract_interval = practitioner.availability_interval
+
+
             new_appointment = GenericAppointment.objects.create(
                 appointer=practitioner,
                 appointee=client,

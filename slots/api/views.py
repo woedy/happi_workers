@@ -3,6 +3,7 @@ from datetime import datetime, date, timedelta
 from dateutil.relativedelta import relativedelta
 from django.contrib.auth import get_user_model
 from django.db.models import Q
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.response import Response
@@ -70,12 +71,12 @@ def set_appointer_slot(request):
                     # Convert the times to datetime objects
                     time_objects = [datetime.strptime(t, "%H:%M:%S" if len(t) > 5 else "%H:%M").time() for t in slot_data['time_slots']]
 
-                    # Check if the times are at least  hours apart
-                    if not are_times_spaced(interval, time_objects):
-                        errors['availability'] = [f'Times provided should be at least {interval} apart.']
-                        payload['message'] = "Errors"
-                        payload['errors'] = errors
-                        return Response(payload, status=status.HTTP_400_BAD_REQUEST)
+                    # # Check if the times are at least  hours apart
+                    # if not are_times_spaced(interval, time_objects):
+                    #     errors['availability'] = [f'Times provided should be at least {interval} apart.']
+                    #     payload['message'] = "Errors"
+                    #     payload['errors'] = errors
+                    #     return Response(payload, status=status.HTTP_400_BAD_REQUEST)
 
                     # Check if a slot with the same date already exists
                     existing_slot = existing_slots.filter(slot_date=slot_date).first()
@@ -716,6 +717,87 @@ def remove_appointer_slot(request):
 @permission_classes([])
 @authentication_classes([])
 def list_practitioner_availability(request):
+    payload = {}
+    data = {}
+    errors = {}
+
+    if request.method == 'POST':
+        pract_id = request.data.get('pract_id', "")
+        company_id = request.data.get('company_id', "")
+
+        if not pract_id:
+            errors['pract_id'] = ['Practitioner User ID is required.']
+
+        if not company_id:
+            errors['company_id'] = ['Company ID is required.']
+
+        try:
+            company = Company.objects.get(company_id=company_id)
+        except Company.DoesNotExist:
+            errors['company_id'] = ['Company does not exist.']
+
+        try:
+            appointer = User.objects.get(user_id=pract_id)
+            availability_interval = appointer.availability_interval
+            data['availability_interval'] = availability_interval
+
+            # Define time range based on the chosen interval
+            now = timezone.now()
+            if availability_interval == "1 hour":
+                end_time = now + timedelta(hours=1)
+            elif availability_interval == "6 hours":
+                end_time = now + timedelta(hours=6)
+            elif availability_interval == "12 hours":
+                end_time = now + timedelta(hours=12)
+            elif availability_interval == "8 hours":
+                end_time = now + timedelta(hours=8)
+            elif availability_interval == "24 hours":
+                end_time = now + timedelta(hours=24)
+            elif availability_interval == "48 hours":
+                end_time = now + timedelta(hours=48)
+            else:
+                errors['availability_interval'] = ['Invalid availability interval.']
+
+            if 'availability_interval' not in errors:
+                # Query for available appointment slots beyond the defined time range
+                available_slots = AppointmentSlot.objects.filter(
+                    user_id=appointer,
+                    slot_date__gte=now,  # Filter for slots with dates beyond or equal to the current date
+                )
+
+                available_slots_data = []
+                for slot in available_slots:
+                    time_slots = TimeSlot.objects.filter(
+                        appointment_slot=slot,
+                        time__gte=end_time,  # Filter for time slots beyond the end of the chosen interval
+                        occupied=False,  # Consider only unoccupied time slots
+
+                    ).values_list('time', flat=True)
+                    available_slots_data.append({
+                        'slot_date': slot.slot_date,
+                        'time_slots': list(time_slots),
+                    })
+
+                data['available_practitioner_slots'] = available_slots_data
+
+        except User.DoesNotExist:
+            errors['pract_id'] = ['Practitioner does not exist.']
+
+        if errors:
+            payload['message'] = "Errors"
+            payload['errors'] = errors
+            return Response(payload, status=status.HTTP_400_BAD_REQUEST)
+
+        payload['message'] = "Successful"
+        payload['data'] = data
+
+        return Response(payload)
+
+
+@api_view(['POST', ])
+@permission_classes([])
+@authentication_classes([])
+def list_practitioner_availabilityWORKING(request):
     payload = {}
     data = {}
 
