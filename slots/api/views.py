@@ -1,10 +1,11 @@
 from datetime import datetime, date, timedelta
 
+from click.core import F
 from dateutil.relativedelta import relativedelta
 from django.contrib.auth import get_user_model
-from django.db.models import Q
+from django.db.models import Q, ExpressionWrapper
 from django.utils import timezone
-from rest_framework import status
+from rest_framework import status, fields
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.response import Response
 
@@ -712,11 +713,82 @@ def remove_appointer_slot(request):
         return Response(payload)
 
 
-
 @api_view(['POST', ])
 @permission_classes([])
 @authentication_classes([])
 def list_practitioner_availability(request):
+    payload = {}
+    data = {}
+    errors = {}
+
+    if request.method == 'POST':
+        pract_id = request.data.get('pract_id', "")
+        company_id = request.data.get('company_id', "")
+        interval_hours = request.data.get('availability_interval', "1 hour")
+
+        if not pract_id:
+            errors['pract_id'] = ['Practitioner User ID is required.']
+
+        if not company_id:
+            errors['company_id'] = ['Company ID is required.']
+
+        try:
+            company = Company.objects.get(company_id=company_id)
+        except Company.DoesNotExist:
+            errors['company_id'] = ['Company does not exist.']
+
+        try:
+            appointer = User.objects.get(user_id=pract_id)
+            availability_interval = appointer.availability_interval
+
+            current_datetime = datetime.now()
+            interval_mapping = {
+                "1 hour": timedelta(hours=1),
+                "6 hours": timedelta(hours=6),
+                "12 hours": timedelta(hours=12),
+                "8 hours": timedelta(hours=8),
+                "24 hours": timedelta(hours=24),
+                "48 hours": timedelta(hours=48)
+            }
+            interval_timedelta = interval_mapping.get(interval_hours, timedelta(hours=1))
+
+            data['availability_interval'] = availability_interval
+
+            # Calculate the threshold datetime
+            threshold_datetime = current_datetime + interval_timedelta
+
+            # Filter availability slots using a custom SQL query
+            available_slots_within_interval = AppointmentSlot.objects.annotate(
+                slot_datetime=ExpressionWrapper(
+                    F('slot_date') + F('slot_times__time'),
+                    output_field=fields.DateTimeField()
+                )
+            ).filter(
+                user_id=appointer,
+                slot_datetime__gte=current_datetime,
+                slot_datetime__lt=threshold_datetime
+            )
+
+            all_app_slots_serializer = AppointmentSlotSerializer(available_slots_within_interval, many=True)
+            _all_app_slots = all_app_slots_serializer.data
+            data['all_practitioner_slots'] = _all_app_slots
+
+        except User.DoesNotExist:
+            errors['client_id'] = ['Practitioner does not exist']
+
+        if errors:
+            payload['message'] = "Errors"
+            payload['errors'] = errors
+            return Response(payload, status=status.HTTP_400_BAD_REQUEST)
+
+        payload['message'] = "Successful"
+        payload['data'] = data
+        return Response(payload)
+
+@api_view(['POST', ])
+@permission_classes([])
+@authentication_classes([])
+def list_practitioner_availabilityCCCC(request):
     payload = {}
     data = {}
     errors = {}
@@ -743,6 +815,10 @@ def list_practitioner_availability(request):
 
             # Define time range based on the chosen interval
             now = timezone.now()
+
+
+
+
             if availability_interval == "1 hour":
                 end_time = now + timedelta(hours=1)
             elif availability_interval == "6 hours":
@@ -762,23 +838,41 @@ def list_practitioner_availability(request):
                 # Query for available appointment slots beyond the defined time range
                 available_slots = AppointmentSlot.objects.filter(
                     user_id=appointer,
+                   # slot_date=now,  # Filter for slots with dates beyond or equal to the current date
                     slot_date__gte=now,  # Filter for slots with dates beyond or equal to the current date
                 )
 
-                available_slots_data = []
+                print("###############")
+                print(now)
+                print(end_time)
+                _slot_list = []
                 for slot in available_slots:
-                    time_slots = TimeSlot.objects.filter(
-                        appointment_slot=slot,
-                        time__gte=end_time,  # Filter for time slots beyond the end of the chosen interval
-                        occupied=False,  # Consider only unoccupied time slots
+                    #print(slot.slot_date)
+                    _slot_list.append(slot.slot_date)
 
-                    ).values_list('time', flat=True)
-                    available_slots_data.append({
-                        'slot_date': slot.slot_date,
-                        'time_slots': list(time_slots),
-                    })
+                print("###############")
 
-                data['available_practitioner_slots'] = available_slots_data
+                print("_slot_list")
+                print(_slot_list)
+
+
+                #closest_date = min(_slot_list, key=lambda date: abs(date - current_date))
+                #print(closest_date)
+
+                #available_slots_data = []
+                #for slot in available_slots:
+                #    time_slots = TimeSlot.objects.filter(
+                #        appointment_slot=slot,
+                #        time__gte=end_time,  # Filter for time slots beyond the end of the chosen interval
+                #        occupied=False,  # Consider only unoccupied time slots
+#
+                #    ).values_list('time', flat=True)
+                #    available_slots_data.append({
+                #        'slot_date': slot.slot_date,
+                #        'time_slots': list(time_slots),
+                #    })
+#
+                #data['available_practitioner_slots'] = available_slots_data
 
         except User.DoesNotExist:
             errors['pract_id'] = ['Practitioner does not exist.']
