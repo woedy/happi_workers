@@ -712,19 +712,18 @@ def remove_appointer_slot(request):
 
         return Response(payload)
 
-
 @api_view(['POST', ])
 @permission_classes([])
 @authentication_classes([])
 def list_practitioner_availability(request):
     payload = {}
     data = {}
+
     errors = {}
 
     if request.method == 'POST':
         pract_id = request.data.get('pract_id', "")
         company_id = request.data.get('company_id', "")
-        interval_hours = request.data.get('availability_interval', "1 hour")
 
         if not pract_id:
             errors['pract_id'] = ['Practitioner User ID is required.']
@@ -741,6 +740,7 @@ def list_practitioner_availability(request):
             appointer = User.objects.get(user_id=pract_id)
             availability_interval = appointer.availability_interval
 
+            # Calculate the datetime threshold based on the specified interval
             current_datetime = datetime.now()
             interval_mapping = {
                 "1 hour": timedelta(hours=1),
@@ -750,26 +750,26 @@ def list_practitioner_availability(request):
                 "24 hours": timedelta(hours=24),
                 "48 hours": timedelta(hours=48)
             }
-            interval_timedelta = interval_mapping.get(interval_hours, timedelta(hours=1))
+            threshold_datetime = current_datetime + interval_mapping.get(availability_interval, timedelta(hours=1))
 
             data['availability_interval'] = availability_interval
 
-            # Calculate the threshold datetime
-            threshold_datetime = current_datetime + interval_timedelta
-
-            # Filter availability slots using a custom SQL query
-            available_slots_within_interval = AppointmentSlot.objects.annotate(
-                slot_datetime=ExpressionWrapper(
-                    F('slot_date') + F('slot_times__time'),
-                    output_field=fields.DateTimeField()
-                )
-            ).filter(
+            # Filter availability slots based on the threshold_datetime
+            all_app_slots = AppointmentSlot.objects.filter(
                 user_id=appointer,
-                slot_datetime__gte=current_datetime,
-                slot_datetime__lt=threshold_datetime
+                slot_date__gte=threshold_datetime.date(),
             )
 
-            all_app_slots_serializer = AppointmentSlotSerializer(available_slots_within_interval, many=True)
+            #print(current_datetime.date())
+            #print("###############")
+
+            for _slot in all_app_slots:
+                if str(current_datetime.date()) == str(_slot.slot_date):
+                    # check slots with times before the threshold time
+                    print(_slot.slot_date)
+                    print(_slot.slot_times)
+
+            all_app_slots_serializer = AppointmentSlotSerializer(all_app_slots, many=True)
             _all_app_slots = all_app_slots_serializer.data
             data['all_practitioner_slots'] = _all_app_slots
 
@@ -784,6 +784,8 @@ def list_practitioner_availability(request):
         payload['message'] = "Successful"
         payload['data'] = data
         return Response(payload)
+
+
 
 @api_view(['POST', ])
 @permission_classes([])
