@@ -17,6 +17,13 @@ from slots.models import AppointmentSlot, TimeSlot
 User = get_user_model()
 
 
+"""
+Still working on interval availability
+using date at the moment
+Now work with time.
+"""
+
+
 
 @api_view(['POST', ])
 @permission_classes([])
