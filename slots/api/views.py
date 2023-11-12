@@ -1530,3 +1530,16 @@ def set_recurring_list_slot2222(request):
 
         return Response(payload)
 
+
+
+
+
+@api_view(['POST', ])
+@permission_classes([])
+@authentication_classes([])
+def set_recurring_slot_plumm(request):
+    payload = {}
+    data = {}
+    errors = {}
+
+    return Response(payload)
