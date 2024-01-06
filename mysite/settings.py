@@ -25,16 +25,24 @@ SECRET_KEY = "django-insecure-tkvixfgpyk2$1!p^0m=*01hl_0cf6%-hzzs9wc(e5(l_^so&jx
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ["192.168.43.220", "127.0.0.1", "0.0.0.0"]
+ALLOWED_HOSTS = ["192.168.43.220", "127.0.0.1", "0.0.0.0","localhost"]
 
+
+# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# EMAIL_HOST = 'box.teamalfy.co.uk'
+# EMAIL_PORT = 465
+# EMAIL_USE_SSL = True
+# EMAIL_HOST_USER = 'no-reply@teamalfy.co.uk'
+# EMAIL_HOST_PASSWORD = 'gYgG2GwiJq'
+# DEFAULT_FROM_EMAIL = 'no-reply@teamalfy.co.uk'
 
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'box.teamalfy.co.uk'
-EMAIL_PORT = 465
-EMAIL_USE_SSL = True
-EMAIL_HOST_USER = 'no-reply@teamalfy.co.uk'
-EMAIL_HOST_PASSWORD = 'gYgG2GwiJq'
-DEFAULT_FROM_EMAIL = 'no-reply@teamalfy.co.uk'
+EMAIL_HOST = 'localhost'
+EMAIL_PORT = 1025
+EMAIL_USE_SSL = ''
+EMAIL_HOST_USER = 'admin@happiworks.test'
+EMAIL_HOST_PASSWORD = ''
+DEFAULT_FROM_EMAIL = 'admin@happiworks.test'
 
 
 # Application definition
@@ -103,28 +111,28 @@ WSGI_APPLICATION = "mysite.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
-    }
-}
-
-
-
 # DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.postgresql',
-#         'NAME': 'postgres',
-#         'USER': 'postgres',
-#         'PASSWORD': 'postgres',
-#         'HOST': 'db',
-#         'PORT': 5432,
+#     "default": {
+#         "ENGINE": "django.db.backends.sqlite3",
+#         "NAME": BASE_DIR / "db.sqlite3",
 #     }
 # }
 
-CELERY_BROKER_URL = "redis://redis:6379"
-CELERY_RESULT_BACKEND = "redis://redis:6379"
+
+
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'postgres',
+        'USER': 'postgres',
+        'PASSWORD': 'postgres',
+        'HOST': 'db',
+        'PORT': 5432,
+    }
+}
+
+# CELERY_BROKER_URL = "redis://redis:6379"
+# CELERY_RESULT_BACKEND = "redis://redis:6379"
 
 
 # Password validation
@@ -178,12 +186,6 @@ HOST_SCHEME = "http://"
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
-
-
-from celery import Celery
-app = Celery('mysite')
-app.config_from_object('django.conf:settings', namespace='CELERY')
-app.autodiscover_tasks()
 
 
 
