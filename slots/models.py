@@ -1,6 +1,8 @@
 from django.conf import settings
 from django.db import models
+from django.db.models.signals import pre_save
 
+from mysite.utils import unique_recurring_id_generator
 
 # Create your models here.
 
@@ -125,6 +127,8 @@ MONTH_CHOICES = [
 
 class PlummHealthRecurring(models.Model):
     user_id = models.ForeignKey(User, on_delete=models.CASCADE, related_name="plum_recurring")
+    recurring_id = models.CharField(max_length=255, blank=True, null=True, unique=True)
+
     start_date = models.DateField()
     end_date = models.DateField()
 
@@ -143,3 +147,9 @@ class PlummHealthRecurring(models.Model):
     end_repeat_on = models.DateField(null=True, blank=True)
     end_repeat_after = models.IntegerField(default=1)
 
+
+def pre_save_recurring_id_receiver(sender, instance, *args, **kwargs):
+    if not instance.recurring_id:
+        instance.recurring_id = unique_recurring_id_generator(instance)
+
+pre_save.connect(pre_save_recurring_id_receiver, sender=PlummHealthRecurring)

@@ -41,6 +41,21 @@ def unique_user_id_generator(instance):
 
 
 
+def unique_recurring_id_generator(instance):
+    """
+    This is for a django project with a recurring_id field
+    """
+    size = random.randint(30, 45)
+    recurring_id = random_string_generator(size=size)
+
+    Klass = instance.__class__
+    qs_exists = Klass.objects.filter(recurring_id=recurring_id).exists()
+    if qs_exists:
+        return
+    return recurring_id
+
+
+
 def unique_company_id_generator(instance):
     """
     This is for a django project with a company_id field

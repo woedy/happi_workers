@@ -29,7 +29,7 @@ class UserAdmin(BaseUserAdmin):
          ),
     )
 
-    search_fields = ('email', 'full_name',)
+    search_fields = ('email', 'full_name', 'user_id')
     ordering = ('email',)
     filter_horizontal = ()
 

@@ -840,11 +840,62 @@ def cancel_appointment_view(request):
 
     return Response(payload)
 
-
 @api_view(['POST', ])
 @permission_classes([])
 @authentication_classes([])
 def list_practitioner_appointment_view(request):
+    payload = {}
+    data = {}
+    errors = {}
+
+    if request.method == 'POST':
+        pract_id = request.data.get('pract_id', "")
+        company_id = request.data.get('company_id', "")
+        appointment_status = request.data.get('appointment_status', "")  # Add this line
+
+        if not pract_id:
+            errors['pract_id'] = ['Practitioner User ID is required.']
+
+        if not company_id:
+            errors['company_id'] = ['Company ID is required.']
+
+        try:
+            company = Company.objects.get(company_id=company_id)
+        except Company.DoesNotExist:
+            errors['company_id'] = ['Company does not exist.']
+
+        try:
+            practitioner = User.objects.get(user_id=pract_id)
+
+            # Filter appointments based on status
+            filters = {'appointer': practitioner}
+            if appointment_status:
+                filters['status'] = appointment_status
+
+            all_pract_appointments = GenericAppointment.objects.filter(**filters).order_by('-created_at')
+
+            all_pract_appointments_serializer = ListPractGenericAppointmentSerializer(all_pract_appointments, many=True)
+            _all_pract_appointments = all_pract_appointments_serializer.data
+            data['all_pract_appointments'] = _all_pract_appointments
+
+        except User.DoesNotExist:
+            errors['pract_id'] = ['Practitioner does not exist.']
+
+        if errors:
+            payload['message'] = "Errors"
+            payload['errors'] = errors
+            return Response(payload, status=status.HTTP_400_BAD_REQUEST)
+
+        payload['message'] = "Appointments retrieved successfully"
+        payload['data'] = data
+
+        return Response(payload)
+
+
+@api_view(['POST', ])
+@permission_classes([])
+@authentication_classes([])
+def list_practitioner_appointment_view222(request):
     payload = {}
     data = {}
 
@@ -892,10 +943,65 @@ def list_practitioner_appointment_view(request):
 
         return Response(payload)
 
+
+
 @api_view(['POST', ])
 @permission_classes([])
 @authentication_classes([])
 def list_client_appointment_view(request):
+    payload = {}
+    data = {}
+    errors = {}
+
+    if request.method == 'POST':
+        client_id = request.data.get('client_id', "")
+        company_id = request.data.get('company_id', "")
+        appointment_status = request.data.get('appointment_status', "")  # Add this line
+
+        if not client_id:
+            errors['client_id'] = ['Client User ID is required.']
+
+        if not company_id:
+            errors['company_id'] = ['Company ID is required.']
+
+        try:
+            company = Company.objects.get(company_id=company_id)
+        except Company.DoesNotExist:
+            errors['company_id'] = ['Company does not exist.']
+
+        try:
+            client = User.objects.get(user_id=client_id)
+
+            # Filter appointments based on status
+            filters = {'appointee': client}
+            if appointment_status:
+                filters['status'] = appointment_status
+
+            all_client_appointments = GenericAppointment.objects.filter(**filters).order_by('-created_at')
+
+            all_client_appointments_serializer = ListClientGenericAppointmentSerializer(all_client_appointments,
+                                                                                        many=True)
+            _all_client_appointments = all_client_appointments_serializer.data
+            data['all_client_appointments'] = _all_client_appointments
+
+        except User.DoesNotExist:
+            errors['client_id'] = ['Client does not exist.']
+
+        if errors:
+            payload['message'] = "Errors"
+            payload['errors'] = errors
+            return Response(payload, status=status.HTTP_400_BAD_REQUEST)
+
+        payload['message'] = "Appointments retrieved successfully"
+        payload['data'] = data
+
+        return Response(payload)
+
+
+@api_view(['POST', ])
+@permission_classes([])
+@authentication_classes([])
+def list_client_appointment_view222(request):
     payload = {}
     data = {}
 
