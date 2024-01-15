@@ -1,0 +1,22 @@
+sudo apt update
+
+
+
+
+docker-compose build
+
+
+docker-compose run --rm app django-admin startproject mysite .
+docker-compose up
+
+docker exec -it django_app sh
+
+sudo chattr -i mysite
+
+sudo rm -r mysite
+
+
+
+sudo docker volume rm $(sudo docker volume ls -q)
+sudo docker rm -f $(sudo docker ps -a -q)
+sudo docker rmi $(sudo docker images -q)
