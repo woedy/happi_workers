@@ -2,7 +2,7 @@ from django.conf import settings
 from django.db import models
 from django.db.models.signals import pre_save
 
-from mysite.utils import unique_recurring_id_generator
+from happi_project.utils import unique_recurring_id_generator
 
 # Create your models here.
 

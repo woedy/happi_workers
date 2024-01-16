@@ -6,7 +6,7 @@ from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from rest_framework.authtoken.models import Token
 
-from mysite.utils import unique_user_id_generator, unique_company_id_generator
+from happi_project.utils import unique_user_id_generator, unique_company_id_generator
 
 
 class UserManager(BaseUserManager):

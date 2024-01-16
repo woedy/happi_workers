@@ -4,7 +4,7 @@ services:
   # Redis
   redis:
     image: redis:alpine
-    container_name: redis
+    container_name: happi_redis
 
   # Database Postgres
   db:
@@ -12,22 +12,22 @@ services:
     volumes:
       - ./data/db:/var/lib/postgresql/data
     environment:
-      - POSTGRES_DB=postgres
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-    container_name: postgres_db
+      - POSTGRES_DB=happi_postgres
+      - POSTGRES_USER=happi_postgres
+      - POSTGRES_PASSWORD=happi_postgres
+    container_name: happi_postgres_db
 
   # Django Application
-  app:
+  happi_app:
     build: .
     volumes:
-      - .:/django
+      - .:/happi_django
       - ./static_cdn:/var/lib/static_cdn
     ports:
-      - 8080:8080
-    image: app:django
-    container_name: django_app
-    command: python manage.py runserver 0.0.0.0:8080
+      - 9090:9090
+    image: happi_app:django
+    container_name: happi_django_app
+    command: python manage.py runserver 0.0.0.0:9090
     depends_on:
       - db 
 
@@ -36,28 +36,28 @@ services:
     restart: always
     build:
       context: .
-    command: celery -A mysite worker -l DEBUG
+    command: celery -A happi_project worker -l DEBUG
     volumes:
-      - .:/django
-    container_name: celery
+      - .:/happi_django
+    container_name: happi_celery
     depends_on:
       - db
       - redis
-      - app
+      - happi_app
 
   # Celery Beat
   celery-beat:
     restart: always
     build:
       context: .
-    command: celery -A mysite beat -l DEBUG
+    command: celery -A happi_project beat -l DEBUG
     volumes:
-      - .:/django
-    container_name: celery_beat
+      - .:/happi_django
+    container_name: happi_celery_beat
     depends_on:
       - db
       - redis
-      - app
+      - happi_app
 
 volumes:
   static_cdn:

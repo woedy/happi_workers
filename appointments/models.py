@@ -3,7 +3,7 @@ from django.db import models
 from django.db.models import Q
 from django.db.models.signals import pre_save
 
-from mysite.utils import unique_appointment_id_generator
+from happi_project.utils import unique_appointment_id_generator
 from slots.models import AppointmentSlot
 
 User = settings.AUTH_USER_MODEL

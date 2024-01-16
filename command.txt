@@ -6,10 +6,10 @@ sudo apt update
 docker-compose build
 
 
-docker-compose run --rm app django-admin startproject mysite .
+docker-compose run --rm happi_app
 docker-compose up
 
-docker exec -it django_app sh
+docker exec -it happi_django_app sh
 
 sudo chattr -i mysite
 
