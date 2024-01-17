@@ -37,7 +37,7 @@ ALLOWED_HOSTS = ["192.168.43.220", "127.0.0.1", "0.0.0.0","localhost"]
 # DEFAULT_FROM_EMAIL = 'no-reply@teamalfy.co.uk'
 
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'localhost'
+EMAIL_HOST = 'mailpit'
 EMAIL_PORT = 1025
 EMAIL_USE_SSL = ''
 EMAIL_HOST_USER = 'admin@happiworks.test'
