@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from celery import chain
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.mail import EmailMessage
@@ -15,6 +16,7 @@ from appointments.api.serializers import GenericAppointmentSerializer, \
     ListPractGenericAppointmentSerializer, ListClientGenericAppointmentSerializer
 from appointments.models import GenericAppointment
 from slots.models import AppointmentSlot, TimeSlot
+from happi_project.tasks import send_client_email, send_practitioner_email
 
 User = get_user_model()
 
@@ -24,6 +26,157 @@ User = get_user_model()
 @permission_classes([])
 @authentication_classes([])
 def set_appointment_view(request):
+    payload = {}
+    data = {}
+    errors = {}
+
+    if request.method == 'POST':
+        client_id = request.data.get('client_id', "")
+        pract_id = request.data.get('pract_id', "")
+        company_id = request.data.get('company_id', "")
+        slot_id = request.data.get('slot_id', "")
+        slot_time = request.data.get('slot_time', "")
+
+        if not client_id:
+            errors['client_id'] = ['Client User ID is required.']
+
+        if not pract_id:
+            errors['pract_id'] = ['Practitioner User ID is required.']
+
+        if not company_id:
+            errors['company_id'] = ['Company ID is required.']
+
+        if not slot_id:
+            errors['slot_id'] = ['Slot id is required.']
+
+        if not slot_time:
+            errors['slot_time'] = ['Slot time is required.']
+        else:
+            # Ensure the time is in the format "HH:MM:SS"
+            if len(slot_time) < 8:
+                slot_time += ':00'
+        try:
+            company = Company.objects.get(company_id=company_id)
+        except Company.DoesNotExist:
+            errors['company_id'] = ['Company does not exist.']
+
+        try:
+            client = User.objects.get(user_id=client_id)
+        except User.DoesNotExist:
+            errors['client_id'] = ['Client does not exist']
+
+        try:
+            practitioner = User.objects.get(user_id=pract_id)
+        except User.DoesNotExist:
+            errors['pract_id'] = ['Practitioner does not exist']
+
+        try:
+            app_slot = AppointmentSlot.objects.get(id=slot_id)
+
+            admin = User.objects.filter(company=company, user_type="Admin").first()
+
+            # Check if there's already an appointment for the same date and time
+            existing_appointment = GenericAppointment.objects.filter(
+                slot=app_slot,
+                appointment_time=slot_time,
+                appointee=client,
+                appointer=practitioner,
+            ).first()
+
+            if existing_appointment:
+                errors['slot_date'] = ['Appointment for this date and time already exists.']
+                payload['message'] = "Errors"
+                payload['errors'] = errors
+                return Response(payload, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+            # Check for appointment interval
+            _slot_date = app_slot.slot_date
+            pract_interval = practitioner.availability_interval
+
+
+            new_appointment = GenericAppointment.objects.create(
+                appointer=practitioner,
+                appointee=client,
+                app_admin=admin,
+                slot=app_slot,
+                appointment_date=app_slot.slot_date,
+                appointment_time=slot_time,
+            )
+
+            app_slot.state = "Partial"
+            app_slot.save()
+
+            slot_times = TimeSlot.objects.filter(appointment_slot=app_slot)
+
+            for time in slot_times:
+                if str(time.time) == str(slot_time):
+                    print("################")
+                    print("The time is in the database")
+                    if time.occupied:
+                        errors['slot_time'] = ['Slot time is already occupied.']
+                        payload['message'] = "Errors"
+                        payload['errors'] = errors
+                        return Response(payload, status=status.HTTP_400_BAD_REQUEST)
+                    elif not time.occupied:
+                        time.occupied = True
+                        time.occupant = client
+                        time.appointment_id = new_appointment.id
+                        time.save()
+
+            occupied_count = TimeSlot.objects.filter(appointment_slot=app_slot, occupied=True)
+
+            if len(occupied_count) == app_slot.time_slot_count:
+                app_slot.state = "Occupied"
+                app_slot.save()
+
+            # SEND CLIENT EMAIL
+            client_subject = f"Yay! Your Appointment with {practitioner.full_name} is Confirmed 🎉"
+            client_content = f"Hey {client.full_name},\nGuess what? Your appointment with {practitioner.full_name} on {new_appointment.appointment_date} at {new_appointment.appointment_time} is all set! 🌟\n\nMark your calendar and set your reminders because we can't wait to see you!\n\nCheers,\n\nThe {company.company_name} Team"
+
+            # SEND PRACTITIONER EMAIL
+            pract_subject = f"New Appointment Alert!🚨"
+            pract_content = f"Hello {practitioner.full_name},\n\nGreat news! {client.full_name} has booked an appointment with you on {new_appointment.appointment_date} at {new_appointment.appointment_time}. Time to show off your skills!🌟\n\nBest,\n\nThe {company.company_name} Team"
+
+            # Use Celery chain to execute tasks in sequence
+            email_chain = chain(
+                send_client_email.si(client_subject, client_content, client.email),
+                send_practitioner_email.si(pract_subject, pract_content, practitioner.email),
+            )
+
+            # Execute the Celery chain asynchronously
+            email_chain.apply_async()
+
+
+            # Add new ACTIVITY
+            new_activity = AllActivity.objects.create(
+                user=new_appointment.app_admin,
+                subject="New Appointment Set",
+                body=f"New appointment set between {practitioner.full_name} and {client.full_name} on {new_appointment.appointment_date} at {new_appointment.appointment_time}"
+            )
+            new_activity.save()
+
+            data['appointment_id'] = new_appointment.appointment_id
+            payload['data'] = data
+
+        except AppointmentSlot.DoesNotExist:
+            errors['slot_id'] = ['Slot does not exist']
+
+        if errors:
+            payload['message'] = "Errors"
+            payload['errors'] = errors
+            return Response(payload, status=status.HTTP_400_BAD_REQUEST)
+
+        payload['message'] = "Appointment added successfully"
+        return Response(payload)
+
+
+
+@api_view(['POST', ])
+@permission_classes([])
+@authentication_classes([])
+def set_appointment_view3333333333(request):
     payload = {}
     data = {}
     errors = {}
