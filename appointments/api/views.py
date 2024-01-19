@@ -469,10 +469,135 @@ def set_appointment_view2222(request):
 
         return Response(payload)
 
+
 @api_view(['POST', ])
 @permission_classes([])
 @authentication_classes([])
 def update_appointment_view(request):
+    payload = {}
+    data = {}
+    errors = {}
+
+    if request.method == 'POST':
+        client_id = request.data.get('client_id', "")
+        company_id = request.data.get('company_id', "")
+        appointment_id = request.data.get('appointment_id', "")
+        slot_id = request.data.get('slot_id', "")
+        old_slot_time = request.data.get('old_slot_time', "")
+        new_slot_time = request.data.get('new_slot_time', "")
+
+        if not client_id:
+            errors['client_id'] = ['Client User ID is required.']
+
+        if not company_id:
+            errors['company_id'] = ['Company ID is required.']
+        if not slot_id:
+            errors['slot_id'] = ['Slot ID is required.']
+
+        if not old_slot_time:
+            errors['old_slot_time'] = ['Old slot time is required.']
+        else:
+            # Ensure the time is in the format "HH:MM:SS"
+            if len(old_slot_time) < 8:
+                old_slot_time += ':00'
+
+        if not new_slot_time:
+            errors['new_slot_time'] = ['New slot time is required.']
+        else:
+            # Ensure the time is in the format "HH:MM:SS"
+            if len(new_slot_time) < 8:
+                new_slot_time += ':00'
+
+        if not appointment_id:
+            errors['appointment_id'] = ['Appointment Id is required.']
+
+        try:
+            company = Company.objects.get(company_id=company_id)
+        except:
+            errors['company_id'] = ['Company does not exist.']
+
+        try:
+            client = User.objects.get(user_id=client_id)
+        except:
+            errors['client_id'] = ['Client does not exist']
+
+        try:
+            app_slot = AppointmentSlot.objects.get(id=slot_id)
+        except AppointmentSlot.DoesNotExist:
+            errors['slot_id'] = ['Slot does not exist']
+        except Exception as e:
+            errors['slot_id'] = [f'Error fetching slot: {str(e)}']
+
+        if errors:
+            payload['message'] = "Errors"
+            payload['errors'] = errors
+            return Response(payload, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            appointment = GenericAppointment.objects.get(appointment_id=appointment_id)
+        except:
+            errors['appointment_id'] = ['Appointment does not exist']
+
+        slot_times = TimeSlot.objects.all().filter(appointment_slot=app_slot)
+
+        appointment.appointment_time = new_slot_time
+        appointment.save()
+
+        for time in slot_times:
+            if str(time.time) == str(old_slot_time):
+                time.appointment = None
+                time.occupied = False
+                time.occupant = None
+                time.save()
+
+            if str(time.time) == str(new_slot_time):
+                time.appointment = appointment
+                time.occupied = True
+                time.occupant = client
+                time.save()
+
+        appointment.status = "Pending"
+        appointment.re_scheduled = True
+        appointment.appointment_rescheduled_at = timezone.now()
+        appointment.save()
+
+        client_subject = f"Appointment Rescheduled! New Time, Same Great Service 🕐"
+        client_content = f"Hey {appointment.appointee.full_name},\n\nour appointment with {appointment.appointer.full_name} has been rescheduled to {appointment.appointment_date} at {appointment.appointment_time}. We're still super excited to see you!\n\nCheers,\n\nThe {company.company_name} Team"
+
+        pact_subject = f"Appointment Rescheduled!🕐"
+        pract_content = f"We want to inform you that the appointment for {appointment.appointee.full_name} has been rescheduled to {appointment.appointment_date} at {appointment.appointment_time}. Please make note of this change in your schedule.\n\nCheers,\n\nThe {company.company_name} Team"
+
+        email_chain = chain(
+            send_client_email.si(client_subject, client_content, client.email),
+            send_practitioner_email.si(pact_subject, pract_content, appointment.appointer.email),
+        )
+
+        email_chain.apply_async()
+
+        new_activity = AllActivity.objects.create(
+            user=appointment.app_admin,
+            subject="Appointment Rescheduled!",
+            body=f"Appointment between {appointment.appointer.full_name} and {appointment.appointee.full_name} on {appointment.appointment_date} at {appointment.appointment_time} has been rescheduled."
+        )
+        new_activity.save()
+
+        if errors:
+            payload['message'] = "Errors"
+            payload['errors'] = errors
+            return Response(payload, status=status.HTTP_400_BAD_REQUEST)
+
+        payload['message'] = "Appointment rescheduled successfully"
+        payload['data'] = data
+
+        return Response(payload)
+
+
+
+
+@api_view(['POST', ])
+@permission_classes([])
+@authentication_classes([])
+def update_appointment_view22222222222(request):
     payload = {}
     data = {}
 
@@ -526,6 +651,9 @@ def update_appointment_view(request):
         try:
             app_slot = AppointmentSlot.objects.get(id=slot_id)
 
+            print("####################)")
+            print(app_slot)
+
             try:
                 appointment = GenericAppointment.objects.get(appointment_id=appointment_id)
             except:
@@ -559,25 +687,20 @@ def update_appointment_view(request):
             client_subject = f"Appointment Rescheduled! New Time, Same Great Service 🕐"
             client_content = f"Hey {appointment.appointee.full_name},\n\nour appointment with {appointment.appointer.full_name} has been rescheduled to {appointment.appointment_date} at {appointment.appointment_time}. We're still super excited to see you!\n\nCheers,\n\nThe {company.company_name} Team"
 
-            client_email = EmailMessage(
-                client_subject,
-                client_content,
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                to=[appointment.appointee.email])
 
-            client_email.send()
 
             ### SEND PRACTITIONER EMAIL ####
             pact_subject = f"Appointment Rescheduled!🕐"
             pract_content = f"We want to inform you that the appointment for {appointment.appointee.full_name} has been rescheduled to {appointment.appointment_date} at {appointment.appointment_time}. Please make note of this change in your schedule.\n\nCheers,\n\nThe {company.company_name} Team"
 
-            pract_email = EmailMessage(
-                pact_subject,
-                pract_content,
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                to=[appointment.appointer.email])
+            # Use Celery chain to execute tasks in sequence
+            email_chain = chain(
+                send_client_email.si(client_subject, client_content, client.email),
+                send_practitioner_email.si(pract_subject, pract_content, practitioner.email),
+            )
 
-            pract_email.send()
+            # Execute the Celery chain asynchronously
+            email_chain.apply_async()
 
             # Add new ACTIVITY
             new_activity = AllActivity.objects.create(
@@ -954,25 +1077,18 @@ def cancel_appointment_view(request):
             client_subject = f"Appointment Cancelled. We'll Miss You!😢"
             client_content = f"Hi {appointment.appointee.full_name},\n\nWe're sad to hear you've canceled your appointment with {appointment.appointer.full_name}. But hey, life happens! Feel free to book again whenever you're ready.\n\nTake care,\nThe {company.company_name} Team"
 
-            client_email = EmailMessage(
-                client_subject,
-                client_content,
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                to=[appointment.appointee.email])
 
-            client_email.send()
 
             # SEND PRACTITIONER EMAIL
             pract_subject = f"Change of Plans! Appointment Cancelled📅"
             pract_content = f"Hello {appointment.appointer.full_name},\n\nJust a heads-up, {appointment.appointee.full_name} has canceled their appointment on {appointment.appointment_date} at {appointment.appointment_time}. Don't worry, there are plenty more fish in the sea!🐠\n\nBest,\nThe {company.company_name} Team"
 
-            pract_email = EmailMessage(
-                pract_subject,
-                pract_content,
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                to=[appointment.appointer.email])
+            email_chain = chain(
+                send_client_email.si(client_subject, client_content, appointment.appointee.email),
+                send_practitioner_email.si(pract_subject, pract_content, appointment.appointer.email),
+            )
 
-            pract_email.send()
+            email_chain.apply_async()
 
             # Add new ACTIVITY
             new_activity = AllActivity.objects.create(
