@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from celery import chain
 from django.conf import settings
@@ -15,6 +15,7 @@ from activities.models import AllActivity
 from appointments.api.serializers import GenericAppointmentSerializer, \
     ListPractGenericAppointmentSerializer, ListClientGenericAppointmentSerializer
 from appointments.models import GenericAppointment
+from slots.api.serializers import AppointmentSlotSerializer
 from slots.models import AppointmentSlot, TimeSlot
 from happi_project.tasks import send_client_email, send_practitioner_email
 
@@ -470,10 +471,204 @@ def set_appointment_view2222(request):
         return Response(payload)
 
 
+
+
 @api_view(['POST', ])
 @permission_classes([])
 @authentication_classes([])
 def update_appointment_view(request):
+    payload = {}
+    data = {}
+    errors = {}
+
+
+    if request.method == 'POST':
+        client_id = request.data.get('client_id', "")
+        company_id = request.data.get('company_id', "")
+        appointment_id = request.data.get('appointment_id', "")
+        old_slot_id = request.data.get('old_slot_id', "")
+        old_slot_time = request.data.get('old_slot_time', "")
+        new_slot_date = request.data.get('new_slot_date', "")
+        new_slot_time = request.data.get('new_slot_time', "")
+
+        if not client_id:
+            errors['client_id'] = ['Client User ID is required.']
+
+        if not company_id:
+            errors['company_id'] = ['Company ID is required.']
+
+        if not new_slot_date:
+            errors['new_slot_date'] = ['New slot date is required.']
+
+        if not old_slot_time:
+            errors['old_slot_time'] = ['Old slot time is required.']
+        else:
+            # Ensure the time is in the format "HH:MM:SS"
+            if len(old_slot_time) < 8:
+                old_slot_time += ':00'
+
+        if not new_slot_time:
+            errors['new_slot_time'] = ['New slot time is required.']
+        else:
+            # Ensure the time is in the format "HH:MM:SS"
+            if len(new_slot_time) < 8:
+                new_slot_time += ':00'
+
+        if not appointment_id:
+            errors['appointment_id'] = ['Appointment Id is required.']
+
+        if not old_slot_id:
+            errors['old_slot_id'] = ['Old slot Id is required.']
+
+        try:
+            company = Company.objects.get(company_id=company_id)
+        except Company.DoesNotExist:
+            errors['company_id'] = ['Company does not exist.']
+
+        try:
+            client = User.objects.get(user_id=client_id)
+        except User.DoesNotExist:
+            errors['client_id'] = ['Client does not exist']
+
+
+
+        try:
+            appointment = GenericAppointment.objects.get(appointment_id=appointment_id)
+            practitioner = appointment.appointer
+            availability_interval = practitioner.availability_interval
+
+            # Calculate the datetime threshold based on the specified interval
+            current_datetime = datetime.now()
+            interval_mapping = {
+                "1 hour": timedelta(hours=1),
+                "6 hours": timedelta(hours=6),
+                "12 hours": timedelta(hours=12),
+                "8 hours": timedelta(hours=8),
+                "24 hours": timedelta(hours=24),
+                "48 hours": timedelta(hours=48)
+            }
+            threshold_datetime = current_datetime + interval_mapping.get(availability_interval, timedelta(hours=1))
+
+
+            # Filter availability slots based on the threshold_datetime
+            all_app_slots = AppointmentSlot.objects.filter(
+                user_id=practitioner,
+                slot_date__gte=threshold_datetime.date(),
+            )
+
+            for _slot in all_app_slots:
+                if str(current_datetime.date()) == str(_slot.slot_date):
+                    # check slots with times before the threshold time
+                    print(_slot.slot_date)
+                    print(_slot.slot_times)
+
+            all_app_slots_serializer = AppointmentSlotSerializer(all_app_slots, many=True)
+            _all_app_slots = all_app_slots_serializer.data
+
+
+        except GenericAppointment.DoesNotExist:
+            errors['appointment_id'] = ['Appointment does not exist.']
+
+        the_new_date_slot = None
+        _slot_dates = []
+        for _slot in all_app_slots:
+            print(_slot.slot_date)
+            _slot_dates.append(str(_slot.slot_date))
+
+        if new_slot_date not in _slot_dates:
+            errors['appointment_id'] = ['Practitioner does not have availability on the specified date.']
+            data['all_practitioner_slots'] = _all_app_slots
+        else:
+            for _slot in all_app_slots:
+                if str(new_slot_date) == str(_slot.slot_date):
+                    the_new_date_slot = _slot
+
+            # Check if the new time is within the practitioner's availability slot
+
+            new_time_in_availability = False
+            for _slot in all_app_slots:
+                if str(new_slot_date) == str(_slot.slot_date):
+                    for time_slot in _slot.slot_times.all():
+                        if str(time_slot.time) == str(new_slot_time):
+                            new_time_in_availability = True
+                            break
+            if not new_time_in_availability:
+                errors['new_slot_time'] = [
+                    'The specified time is not in the practitioner\'s slot for the selected date.']
+                data['all_practitioner_slots'] = _all_app_slots
+
+        if errors:
+            payload['message'] = "Errors"
+            payload['errors'] = errors
+            payload['data'] = data
+            return Response(payload, status=status.HTTP_400_BAD_REQUEST)
+
+        # Set the new slot to occupied
+        _new_slot = the_new_date_slot
+        new_time = TimeSlot.objects.filter(appointment_slot=_new_slot, time=new_slot_time).first()
+
+        new_time.occupied = True
+        new_time.occupant = client
+        new_time.save()
+
+        # Set the old slot to vacant
+        _old_slot = AppointmentSlot.objects.get(id=old_slot_id)
+        old_times = TimeSlot.objects.filter(appointment_slot=_old_slot)
+        for _time in old_times:
+            # if str(_time.time) == str(new_slot_time):
+            #     print("_time.time")
+            #     print(_time.time)
+            #     _time.occupied = True
+            #     _time.occupant = client
+            #     _time.save()
+
+            if str(_time.time) == str(old_slot_time):
+                print("olddd_time.time")
+                print(_time.time)
+                _time.occupied = False
+                _time.occupant = None
+                _time.save()
+
+
+
+        appointment.status = 'Rescheduled'
+        appointment.appointment_rescheduled_at = timezone.now()
+        appointment.appointment_date = new_slot_date
+        appointment.appointment_time = new_slot_time
+        appointment.re_scheduled = True
+        appointment.save()
+
+
+
+        client_subject = f"Appointment Rescheduled! New Time, Same Great Service 🕐"
+        client_content = f"Hey {appointment.appointee.full_name},\n\nour appointment with {appointment.appointer.full_name} has been rescheduled to {appointment.appointment_date} at {appointment.appointment_time}. We're still super excited to see you!\n\nCheers,\n\nThe {company.company_name} Team"
+#
+        pact_subject = f"Appointment Rescheduled!🕐"
+        pract_content = f"We want to inform you that the appointment for {appointment.appointee.full_name} has been rescheduled to {appointment.appointment_date} at {appointment.appointment_time}. Please make note of this change in your schedule.\n\nCheers,\n\nThe {company.company_name} Team"
+#
+        email_chain = chain(
+            send_client_email.si(client_subject, client_content, client.email),
+            send_practitioner_email.si(pact_subject, pract_content, appointment.appointer.email),
+        )
+##
+        email_chain.apply_async()
+#
+        new_activity = AllActivity.objects.create(
+            user=appointment.app_admin,
+            subject="Appointment Rescheduled!",
+            body=f"Appointment between {appointment.appointer.full_name} and {appointment.appointee.full_name} on {appointment.appointment_date} at {appointment.appointment_time} has been rescheduled."
+        )
+        new_activity.save()
+
+        payload['message'] = "Appointment rescheduled successfully"
+        payload['data'] = data
+
+        return Response(payload)
+
+@api_view(['POST', ])
+@permission_classes([])
+@authentication_classes([])
+def update_appointment_view3333(request):
     payload = {}
     data = {}
     errors = {}
@@ -690,7 +885,7 @@ def update_appointment_view22222222222(request):
 
 
             ### SEND PRACTITIONER EMAIL ####
-            pact_subject = f"Appointment Rescheduled!🕐"
+            pract_subject = f"Appointment Rescheduled!🕐"
             pract_content = f"We want to inform you that the appointment for {appointment.appointee.full_name} has been rescheduled to {appointment.appointment_date} at {appointment.appointment_time}. Please make note of this change in your schedule.\n\nCheers,\n\nThe {company.company_name} Team"
 
             # Use Celery chain to execute tasks in sequence

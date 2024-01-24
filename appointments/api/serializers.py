@@ -66,6 +66,7 @@ class ListPractGenericAppointmentSerializer(serializers.ModelSerializer):
             'appointment_date',
             'appointment_time',
             'status',
+            'slot',
 
             'appointment_start',
             'appointment_end',
@@ -88,6 +89,7 @@ class ListClientGenericAppointmentSerializer(serializers.ModelSerializer):
             'appointment_date',
             'appointment_time',
             'status',
+            'slot',
 
             'appointment_start',
             'appointment_end',
