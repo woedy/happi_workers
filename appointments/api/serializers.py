@@ -40,6 +40,7 @@ class GenericAppointmentSerializer(serializers.ModelSerializer):
             'actual_duration',
 
             'status',
+            'slot',
 
             'appointment_start',
             'appointment_end',
